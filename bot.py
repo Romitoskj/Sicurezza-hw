@@ -64,7 +64,7 @@ class Bot(BaseHTTPRequestHandler):
             self.status['targets'].append(url)
 
         while not stop.is_set():
-            print(f"Request sent, status code:{requests.get(url).status_code}")
+            print(f"Request sent to {url}, status code:{requests.get(url).status_code}")
 
         stop.clear()
         with self.lock:
