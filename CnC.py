@@ -48,12 +48,10 @@ class CnC:
                 if address in self.__bots.keys():
                     try:
                         self.__bots.pop(address)
-                        # print(f"bot {address} removed")
                     except ValueError:
                         print(f"{address} not in bot list")
                 else:
                     self.__bots[address] = int(client.recv(1024).decode("utf-8"))
-                    # print(f"bot {address} added")
             client.close()
 
     def __commands(self) -> str:
