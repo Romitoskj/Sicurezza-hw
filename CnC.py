@@ -7,8 +7,6 @@ import threading
 from termcolor import colored, cprint
 
 
-# TODO function to handle request and remove disconnected bots (add disconnected to a list and remove them after)
-
 class CnC:
     """
     Command & Control center of the botnet.
