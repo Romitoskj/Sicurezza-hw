@@ -84,6 +84,7 @@ class CnC:
                 else:
                     self.__bots[address] = int(client.recv(1024).decode("utf-8"))
             client.close()
+        self.__socket.close()
 
     def __commands(self) -> str:
         """
