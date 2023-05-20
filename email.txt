@@ -1,0 +1,11 @@
+Homework di sicurezza
+
+Ciao!
+Mi dispiace se ti è arrivata questa email una o più volte, ma ho bisogno di testare una botnet che sto programmando
+per il mio corso universitario di sicurezza informatica.
+
+Se sei interassato al codice sorgente, una volta concluso il corso, potrai trovarlo al seguente link:
+https://github.com/uniRomitoskj/Sicurezza-hw
+
+Non segnalarmi come spam per favore :)
+Ti ringrazio per la comprensione.

