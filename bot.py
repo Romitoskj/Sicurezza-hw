@@ -98,9 +98,7 @@ class Bot(BaseHTTPRequestHandler):
         self.send_response(200)
 
     def __info(self):
-        info = platform.uname()._asdict()
-        info['processor'] = platform.processor()
-        return info
+        return platform.uname()._asdict()
 
     def __status(self):
         with self.lock:
